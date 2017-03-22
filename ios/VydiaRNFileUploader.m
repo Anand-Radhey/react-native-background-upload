@@ -52,15 +52,15 @@ RCT_EXPORT_METHOD(getFileInfo:(NSString *)path resolve:(RCTPromiseResolveBlock)r
     @try {
         NSURL *fileUri = [NSURL URLWithString: path];
         NSString *pathWithoutProtocol = [fileUri path];
-        
+
         NSString *name = [fileUri lastPathComponent];
         NSString *extension = [name pathExtension];
         bool exists = [[NSFileManager defaultManager] fileExistsAtPath:pathWithoutProtocol];
         NSMutableDictionary *params = [NSMutableDictionary dictionaryWithObjectsAndKeys: name, @"name", nil];
-        
+
         [params setObject:extension forKey:@"extension"];
         [params setObject:[NSNumber numberWithBool:exists] forKey:@"exists"];
-        
+
         if (exists)
         {
             [params setObject:[self guessMIMETypeFromFileName:name] forKey:@"mimeType"];
@@ -72,7 +72,7 @@ RCT_EXPORT_METHOD(getFileInfo:(NSString *)path resolve:(RCTPromiseResolveBlock)r
                 [params setObject:[NSNumber numberWithLong:fileSize] forKey:@"size"];
             }
         }
-        
+
         resolve(params);
     }
     @catch (NSException *exception) {
@@ -113,9 +113,9 @@ RCT_EXPORT_METHOD(startUpload:(NSDictionary *)options resolve:(RCTPromiseResolve
     NSString *uploadUrl = options[@"url"];
     NSString *fileURI = options[@"path"];
     NSString *method = options[@"method"];
-    NSString *customUploadId = options[@"customUploadId"];    
+    NSString *customUploadId = options[@"customUploadId"];
     NSDictionary *headers = options[@"headers"];
-    
+
     @try {
         NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString: uploadUrl]];
         request.HTTPMethod = method ? method : @"POST";
@@ -138,12 +138,12 @@ RCT_EXPORT_METHOD(startUpload:(NSDictionary *)options resolve:(RCTPromiseResolve
 }
 
 - (NSURLSession *)urlSession: (int) thisUploadId{
-    
+
     if(_urlSession == nil) {
         NSURLSessionConfiguration *sessionConfigurationt = [NSURLSessionConfiguration backgroundSessionConfigurationWithIdentifier:BACKGROUND_SESSION_ID];
         _urlSession = [NSURLSession sessionWithConfiguration:sessionConfigurationt delegate:self delegateQueue:nil];
     }
-    
+
     return _urlSession;
 }
 
@@ -158,9 +158,20 @@ didCompleteWithError:(NSError *)error {
     NSHTTPURLResponse *response = (NSHTTPURLResponse *)uploadTask.response;
     if (response != nil)
     {
+        NSDictionary *_headers = [response allHeaderFields];
+
+        NSString *location = @"";
+        for (NSString *key in [_headers keyEnumerator]) {
+            if ([[key lowercaseString] isEqualToString:@"location"]) {
+                location = [_headers valueForKey:key];
+                break;
+            }
+        }
+
         [data setObject:[NSNumber numberWithInteger:response.statusCode] forKey:@"responseCode"];
+        [data setObject:location forKey:@"location"];
     }
-    
+
     if (error == nil)
     {
         [self _sendEventWithName:@"RNFileUploader-completed" body:data];
@@ -182,7 +193,7 @@ totalBytesExpectedToSend:(int64_t)totalBytesExpectedToSend {
     {
         progress = 100.0 * (float)totalBytesSent / (float)totalBytesExpectedToSend;
     }
-    
+
     [self _sendEventWithName:@"RNFileUploader-progress" body:@{ @"id": task.taskDescription, @"progress": [NSNumber numberWithFloat:progress] }];
 }
 
